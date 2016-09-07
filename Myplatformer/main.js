@@ -26,9 +26,6 @@ function getDeltaTime() {
 	return deltaTime;
 }
 
-// hi world
-
-//if (player.y >= canvas.height) lives--;  LOSE LIVES 
 
 
 //-------------------- Don't modify anything above here
@@ -44,13 +41,33 @@ var TILESET_SPACING = 2;
 var TILESET_COUNT_X = 14;
 var TILESET_COUNT_Y = 14;
 
+var ENEMY_MAXDX = METER * 5;
+var ENEMY_ACCEL = ENEMY_MAXDX * 2;
+var enemies = [];
 var LAYER_COUNT = 3;
 var LAYER_BACKGOUND = 0;
 var LAYER_PLATFORMS = 1;
 var LAYER_LADDERS = 2;
+var LAYER_OBJECT_ENEMIES = 4;
+var LAYER_OBJECT_TRIGGERS = 3;
 
+var GameOverTimer = 3;
+var splashTimer = 1;
+var STATE_SPLASH = 0;
+var STATE_GAME = 1;
+var STATE_GAMEOVER = 2;
+var STATE_WIN = 3;
+var gameState = STATE_SPLASH;
+var gameWon = {
+	hasWon: false,
+};
+
+var audioGameOver = new Audio("gameOver.mp3");
+
+var timer = 20;
 var score = 0;
-var lives = 0;
+var lives = 3;
+var gameOver = false;
 
 // abitrary choice for 1m
 var METER = TILE;
@@ -123,6 +140,9 @@ function bound(value, min, max) {
 	return value;
 }
 
+if (audioGameOver.end == true) {
+	audioGameOver.pause();
+}
 
 function drawMap() {
 	var maxTiles = Math.floor(SCREEN_WIDTH / TILE) + 2;
@@ -194,6 +214,28 @@ function initialize() {
 		}
 	}
 
+	// initialize trigger layer in collision map
+	cells[LAYER_OBJECT_TRIGGERS] = [];
+	idx = 0;
+	for (var y = 0; y < level1.layers[LAYER_OBJECT_TRIGGERS].height; y++) {
+		cells[LAYER_OBJECT_TRIGGERS][y] = [];
+		for (var x = 0; x < level1.layers[LAYER_OBJECT_TRIGGERS].width; x++) {
+			if (level1.layers[LAYER_OBJECT_TRIGGERS].data[idx] != 0) {
+				cells[LAYER_OBJECT_TRIGGERS][y][x] = 1;
+				cells[LAYER_OBJECT_TRIGGERS][y - 1][x] = 1;
+				cells[LAYER_OBJECT_TRIGGERS][y - 1][x + 1] = 1;
+				cells[LAYER_OBJECT_TRIGGERS][y][x + 1] = 1;
+			}
+			else if (cells[LAYER_OBJECT_TRIGGERS][y][x] != 1) {
+				// if we haven't set this cell's value, then set it to 0 now
+				cells[LAYER_OBJECT_TRIGGERS][y][x] = 0;
+			}
+			idx++;
+		}
+	}
+
+
+
 	musicBackground = new Howl(
 		{
 			urls: ["encounter.mp3"],
@@ -211,13 +253,45 @@ function initialize() {
 				isSfxPlaying = false;
 			}
 		});
+
+
 }
 
-function run() {
-	context.fillStyle = "#ccc";
-	context.fillRect(0, 0, canvas.width, canvas.height);
 
-	var deltaTime = getDeltaTime();
+function run() {
+    context.fillStyle = "#ccc";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    var deltaTime = getDeltaTime();
+
+    switch (gameState) {
+        case STATE_SPLASH:
+            runSplash(deltaTime);
+            break;
+        case STATE_GAME:
+            runGame(deltaTime);
+            break;
+        case STATE_GAMEOVER:
+            runGameOver(deltaTime);
+            break;
+		case STATE_WIN:
+			runGameWon(deltaTime);
+			break;
+    }
+}
+
+function runSplash(deltaTime) {
+    splashTimer -= deltaTime;
+    if (splashTimer <= 0) {
+        gameState = STATE_GAME;
+        return;
+    }
+    var Splash_Screen = document.createElement("img");
+    Splash_Screen.src = "Splash_Screen.png";
+    context.drawImage(Splash_Screen, 0, 0)
+}
+
+function runGame(deltaTime) {
 	player.update(deltaTime); // update the player before drawing the map
 	drawMap();
 	player.draw();
@@ -233,19 +307,57 @@ function run() {
 	// score
 	context.fillStyle = "yellow";
 	context.font = "32px Arial";
-	varscoreText = "Score: " + score;
+	var scoreText = "Score: " + score;
 	context.fillText(score, SCREEN_WIDTH - 170, 35);
+
+	context.fillStyle = "red";
+	var timerText = "Time Left:" + timer.toFixed(0);
+	context.fillText(timerText, 10, 75);
+
+	timer -= deltaTime;
+
+	if (timer <= 0) {
+		runGameOver();
+	}
 
 	// life counter
 	for (var i = 0; i < lives; i++) {
 		context.drawImage(heartImage, 20 + ((heartImage.width + 2) * i), 10);
 	}
 
-	// draw the FPS
-	context.fillStyle = "#f00";
-	context.font = "14px Arial";
-	context.fillText("FPS: " + fps, 5, 20, 100);
+  			if (player.position.y > canvas.height + 80)
+	{ lives = lives - 1
+		player.position.set(9 * TILE, 7 * TILE); }
 
+if (lives <= 0){
+runGameOver();
+}
+if (gameWon.hasWon == true) {
+	runGameWon();
+}
+}
+
+function runGameOver(deltaTime) {
+
+    GameOverTimer -= deltaTime;
+    if (GameOverTimer <= 0) {
+        document.location.reload();
+    }
+    var Game_over = document.createElement("img");
+    Game_over.src = "SNAKE!.png";
+    context.drawImage(Game_over, 0, 0)
+	lives = 0
+	musicBackground.pause();
+	audioGameOver.play();
+}
+
+function runGameWon(deltaTime) {
+    context.fillStyle = "#ccc";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+	context.font = "32px Arial";
+	context.fillStyle = "red"
+	context.fillText("WINNER!", SCREEN_WIDTH / 2 - 60, SCREEN_HEIGHT / 2 - 5);
 }
 
 initialize();
